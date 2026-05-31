@@ -1,0 +1,576 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  REVIEWER
+  VIEWER
+}
+
+enum BrainSourceType {
+  TEXT
+  MARKDOWN
+  CSV
+  PDF
+  IMAGE
+  EMAIL_EXPORT
+  SHEET_INSPECTION
+  OTHER
+}
+
+enum BrainCandidateKind {
+  ENTITY
+  FACT
+  RULE
+  OPEN_QUESTION
+  RELATIONSHIP
+}
+
+enum BrainSection {
+  COMPANY_PROFILE
+  PEOPLE_ROLES
+  CUSTOMERS
+  VENDORS
+  PRODUCTS_MENU
+  PRICING_RULES
+  EXPENSE_CATEGORIES
+  RECEIPT_RULES
+  REIMBURSEMENT_RULES
+  SHEET_MAPPINGS
+  WORKFLOWS
+  APPROVAL_RULES
+  OPEN_QUESTIONS
+  SOURCE_LIBRARY
+}
+
+enum BrainReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_CLARIFICATION
+  SUPERSEDED
+}
+
+enum BrainReviewAction {
+  CREATED
+  APPROVED
+  REJECTED
+  EDITED
+  NEEDS_CLARIFICATION
+  SUPERSEDED
+}
+
+enum GmailConnectionStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum GmailSyncRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum GmailThreadTrackStatus {
+  UNTRACKED
+  TRACKED
+  IGNORED
+}
+
+enum InboxEventStatus {
+  NEEDS_REPLY
+  AWAITING_CUSTOMER
+  INVOICE_READY
+  INVOICED
+  MANUAL_REVIEW
+  FOLLOW_UP
+  COMPLETE
+}
+
+enum InboxDraftStatus {
+  DRAFT
+  APPROVED
+  SENT
+  REJECTED
+}
+
+enum InboxActionType {
+  CREATED
+  MANUAL_IMPORTED
+  CLASSIFIED
+  STATUS_CHANGED
+  DRAFT_GENERATED
+  DRAFT_REGENERATED
+  DRAFT_REJECTED
+  DRAFT_APPROVED
+  EMAIL_SENT
+  MARKED_COMPLETE
+  REOPENED
+  POSSIBLE_LINK_SUGGESTED
+  POSSIBLE_LINK_ACCEPTED
+  POSSIBLE_LINK_REJECTED
+}
+
+enum InboxEvidenceKind {
+  GMAIL_MESSAGE
+  GMAIL_ATTACHMENT
+  BRAIN_RECORD
+  SIMILAR_THREAD
+  EXTRACTED_FIELD
+  READINESS_CHECK
+}
+
+enum InboxEventSource {
+  WORDPRESS_BOOKING_FORM
+  NEW_BOOKING_REQUEST
+  DIRECT_CATERING_INTENT
+  MANUAL_IMPORT
+}
+
+model Company {
+  id         String           @id @default(cuid())
+  name       String
+  slug       String           @unique
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  users      User[]
+  sources    BrainSource[]
+  candidates BrainCandidate[]
+  records    BrainRecord[]
+  questions  BrainQuestion[]
+  versions   BrainVersion[]
+  gmailConnections GmailConnection[]
+  gmailSyncRuns    GmailSyncRun[]
+  gmailThreads     GmailThread[]
+  inboxEvents      InboxEvent[]
+}
+
+model User {
+  id           String             @id @default(cuid())
+  companyId    String
+  email        String
+  name         String
+  role         UserRole           @default(REVIEWER)
+  createdAt    DateTime           @default(now())
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviewEvents BrainReviewEvent[]
+  records      BrainRecord[]      @relation("BrainRecordReviewer")
+  versions     BrainVersion[]     @relation("BrainVersionActor")
+  inboxActions InboxAction[]       @relation("InboxActionActor")
+  approvedDrafts InboxDraft[]      @relation("InboxDraftApprover")
+  rejectedDrafts InboxDraft[]      @relation("InboxDraftRejector")
+
+  @@unique([companyId, email])
+}
+
+model BrainSource {
+  id           String                  @id @default(cuid())
+  companyId    String
+  title        String
+  sourceType   BrainSourceType
+  contentHash  String
+  storageRef   String?
+  rawText      String
+  extractedText String?
+  metadata     Json                    @default("{}")
+  importedAt   DateTime                @default(now())
+  createdAt    DateTime                @default(now())
+  company      Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidates   BrainCandidateSource[]
+  records      BrainRecordSource[]
+  versions     BrainVersionSource[]
+  questions    BrainQuestionSource[]
+
+  @@index([companyId, sourceType])
+  @@index([companyId, importedAt])
+  @@unique([companyId, contentHash])
+}
+
+model BrainCandidate {
+  id             String                  @id @default(cuid())
+  companyId      String
+  kind           BrainCandidateKind
+  section        BrainSection
+  title          String
+  body           String
+  structuredData Json                    @default("{}")
+  confidence     Float
+  status         BrainReviewStatus       @default(PENDING)
+  extractedBy    String
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  reviewedAt     DateTime?
+  approvedRecordId String?
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  approvedRecord BrainRecord?            @relation("CandidateApproval", fields: [approvedRecordId], references: [id], onDelete: SetNull)
+  sources        BrainCandidateSource[]
+  reviewEvents   BrainReviewEvent[]
+  question       BrainQuestion?
+
+  @@index([companyId, status])
+  @@index([companyId, section])
+}
+
+model BrainCandidateSource {
+  candidateId String
+  sourceId    String
+  locator     String?
+  evidence    String
+  candidate   BrainCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  source      BrainSource    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([candidateId, sourceId, evidence])
+  @@index([sourceId])
+}
+
+model BrainRecord {
+  id             String                @id @default(cuid())
+  companyId      String
+  section        BrainSection
+  title          String
+  body           String
+  structuredData Json                  @default("{}")
+  status         BrainReviewStatus     @default(APPROVED)
+  reviewerId     String?
+  approvedAt     DateTime?
+  currentVersion Int                   @default(1)
+  supersedesId   String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviewer       User?                 @relation("BrainRecordReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  supersedes     BrainRecord?          @relation("BrainRecordSupersession", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy   BrainRecord[]         @relation("BrainRecordSupersession")
+  candidates     BrainCandidate[]      @relation("CandidateApproval")
+  sources        BrainRecordSource[]
+  reviewEvents   BrainReviewEvent[]
+  questions      BrainQuestion[]
+  versions       BrainVersion[]
+  inboxEvidence  InboxEvidence[]
+
+  @@index([companyId, status, approvedAt])
+  @@index([companyId, section])
+}
+
+model BrainRecordSource {
+  recordId String
+  sourceId String
+  locator  String?
+  evidence String
+  record   BrainRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  source   BrainSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([recordId, sourceId, evidence])
+  @@index([sourceId])
+}
+
+model BrainReviewEvent {
+  id          String            @id @default(cuid())
+  companyId   String
+  candidateId String?
+  recordId    String?
+  actorId     String?
+  action      BrainReviewAction
+  fromStatus  BrainReviewStatus?
+  toStatus    BrainReviewStatus?
+  note        String?
+  before      Json              @default("{}")
+  after       Json              @default("{}")
+  createdAt   DateTime          @default(now())
+  candidate   BrainCandidate?   @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  record      BrainRecord?      @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  actor       User?             @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([candidateId])
+  @@index([recordId])
+}
+
+model BrainQuestion {
+  id          String                @id @default(cuid())
+  companyId   String
+  candidateId String?               @unique
+  recordId    String?
+  title       String
+  body        String
+  status      BrainReviewStatus     @default(NEEDS_CLARIFICATION)
+  answer      String?
+  answeredAt  DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  company     Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  candidate   BrainCandidate?       @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  record      BrainRecord?          @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  sources     BrainQuestionSource[]
+
+  @@index([companyId, status])
+  @@index([recordId])
+}
+
+model BrainQuestionSource {
+  questionId String
+  sourceId   String
+  locator    String?
+  evidence   String
+  question   BrainQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  source     BrainSource   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, sourceId, evidence])
+  @@index([sourceId])
+}
+
+model BrainVersion {
+  id        String               @id @default(cuid())
+  companyId String
+  recordId  String
+  version   Int
+  title     String
+  body      String
+  data      Json                 @default("{}")
+  actorId   String?
+  note      String?
+  createdAt DateTime             @default(now())
+  company   Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  record    BrainRecord          @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  actor     User?                @relation("BrainVersionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  sources   BrainVersionSource[]
+
+  @@unique([recordId, version])
+  @@index([companyId, createdAt])
+  @@index([recordId])
+}
+
+model BrainVersionSource {
+  versionId String
+  sourceId  String
+  locator   String?
+  evidence  String
+  version   BrainVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  source    BrainSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([versionId, sourceId, evidence])
+  @@index([sourceId])
+}
+
+model GmailConnection {
+  id                String                @id @default(cuid())
+  companyId         String
+  email             String?
+  providerAccountId String?
+  status            GmailConnectionStatus @default(DISCONNECTED)
+  historyId         String?
+  lastSyncedAt      DateTime?
+  metadata          Json                  @default("{}")
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  company           Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  syncRuns          GmailSyncRun[]
+
+  @@unique([companyId, email])
+  @@index([companyId, status])
+}
+
+model GmailSyncRun {
+  id                  String             @id @default(cuid())
+  companyId           String
+  connectionId        String?
+  status              GmailSyncRunStatus @default(PENDING)
+  syncWindowStart     DateTime?
+  syncWindowEnd       DateTime?
+  startedAt           DateTime           @default(now())
+  completedAt         DateTime?
+  threadsScanned      Int                @default(0)
+  threadsMatched      Int                @default(0)
+  messagesSynced      Int                @default(0)
+  attachmentsSynced   Int                @default(0)
+  error               String?
+  cursorBefore        String?
+  cursorAfter         String?
+  metadata            Json               @default("{}")
+  company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  connection          GmailConnection?   @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, startedAt])
+  @@index([connectionId, startedAt])
+  @@index([status])
+}
+
+model GmailThread {
+  id                       String                 @id @default(cuid())
+  companyId                String
+  gmailThreadId            String
+  subject                  String
+  participants             Json                   @default("[]")
+  labels                   Json                   @default("[]")
+  isArchived               Boolean                @default(false)
+  latestMessageAt          DateTime?
+  trackStatus              GmailThreadTrackStatus @default(UNTRACKED)
+  metadata                 Json                   @default("{}")
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  company                  Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  messages                 GmailMessage[]
+  inboxEvent               InboxEvent?
+
+  @@unique([companyId, gmailThreadId])
+  @@index([companyId, latestMessageAt])
+  @@index([companyId, trackStatus])
+}
+
+model GmailMessage {
+  id                  String            @id @default(cuid())
+  threadId            String
+  gmailMessageId      String
+  subject             String?
+  from                Json              @default("{}")
+  to                  Json              @default("[]")
+  cc                  Json              @default("[]")
+  bcc                 Json              @default("[]")
+  replyTo             Json              @default("[]")
+  snippet             String?
+  bodyPlain           String?
+  bodyHtml            String?
+  sentAt              DateTime?
+  internalDate        DateTime?
+  metadata            Json              @default("{}")
+  createdAt           DateTime          @default(now())
+  thread              GmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  attachments         GmailAttachment[]
+  actions             InboxAction[]
+  evidence            InboxEvidence[]
+
+  @@unique([threadId, gmailMessageId])
+  @@index([threadId, sentAt])
+}
+
+model GmailAttachment {
+  id                  String          @id @default(cuid())
+  messageId           String
+  gmailAttachmentId   String?
+  filename            String
+  mimeType            String?
+  sizeBytes           Int?
+  contentId           String?
+  storageRef          String?
+  metadata            Json            @default("{}")
+  createdAt           DateTime        @default(now())
+  message             GmailMessage    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  evidence            InboxEvidence[]
+
+  @@unique([messageId, gmailAttachmentId])
+  @@index([messageId])
+  @@index([gmailAttachmentId])
+}
+
+model InboxEvent {
+  id                       String            @id @default(cuid())
+  companyId                String
+  threadId                 String            @unique
+  status                   InboxEventStatus  @default(NEEDS_REPLY)
+  source                   InboxEventSource
+  manualImport             Boolean           @default(false)
+  extractedFields          Json              @default("{}")
+  possibleMatches          Json              @default("[]")
+  recommendedNextAction    String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  completedAt              DateTime?
+  company                  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  thread                   GmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  drafts                   InboxDraft[]
+  actions                  InboxAction[]
+  evidence                 InboxEvidence[]
+
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+  @@index([companyId, updatedAt])
+  @@index([source])
+}
+
+model InboxDraft {
+  id                  String           @id @default(cuid())
+  eventId             String
+  subject             String?
+  body                String
+  status              InboxDraftStatus @default(DRAFT)
+  modelMetadata       Json             @default("{}")
+  approvedAt          DateTime?
+  approvedById        String?
+  rejectedAt          DateTime?
+  rejectedById        String?
+  rejectionNote       String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  event               InboxEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  approvedBy          User?            @relation("InboxDraftApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectedBy          User?            @relation("InboxDraftRejector", fields: [rejectedById], references: [id], onDelete: SetNull)
+  actions             InboxAction[]
+  evidence            InboxEvidence[]
+
+  @@index([eventId, status])
+}
+
+model InboxAction {
+  id                  String          @id @default(cuid())
+  eventId             String
+  draftId             String?
+  messageId           String?
+  actorId             String?
+  actionType          InboxActionType
+  before              Json            @default("{}")
+  after               Json            @default("{}")
+  note                String?
+  createdAt           DateTime        @default(now())
+  event               InboxEvent      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  draft               InboxDraft?     @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  message             GmailMessage?   @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  actor               User?           @relation("InboxActionActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, createdAt])
+  @@index([draftId])
+  @@index([messageId])
+  @@index([actorId])
+  @@index([actionType])
+}
+
+model InboxEvidence {
+  id                  String             @id @default(cuid())
+  eventId             String
+  draftId             String?
+  kind                InboxEvidenceKind
+  gmailMessageId      String?
+  gmailAttachmentId   String?
+  brainRecordId       String?
+  externalRef         String?
+  locator             String?
+  evidenceText        String
+  confidence          Float?
+  metadata            Json               @default("{}")
+  createdAt           DateTime           @default(now())
+  event               InboxEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  draft               InboxDraft?        @relation(fields: [draftId], references: [id], onDelete: SetNull)
+  gmailMessage        GmailMessage?      @relation(fields: [gmailMessageId], references: [id], onDelete: SetNull)
+  gmailAttachment     GmailAttachment?   @relation(fields: [gmailAttachmentId], references: [id], onDelete: SetNull)
+  brainRecord         BrainRecord?       @relation(fields: [brainRecordId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, kind])
+  @@index([draftId])
+  @@index([gmailMessageId])
+  @@index([gmailAttachmentId])
+  @@index([brainRecordId])
+}
+
+model AppState {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
