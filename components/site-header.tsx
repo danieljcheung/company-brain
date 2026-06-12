@@ -6,11 +6,9 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useTutorial } from "@/components/tutorial/tutorial-provider";
 
 export function SiteHeader() {
   const router = useRouter();
-  const { restartTutorial } = useTutorial();
 
   async function handleLogout() {
     await fetch("/api/auth/front-door/logout", { method: "POST" });
@@ -23,23 +21,6 @@ export function SiteHeader() {
       <SidebarTrigger className="-ml-1" data-tutorial="sidebar-toggle" />
       <Separator orientation="vertical" className="mx-2 h-4" />
       <div className="flex-1" />
-      <Button
-        className="hidden sm:inline-flex"
-        variant="ghost"
-        size="sm"
-        onClick={restartTutorial}
-      >
-        Tutorial
-      </Button>
-      <Button
-        className="sm:hidden"
-        variant="ghost"
-        size="sm"
-        onClick={restartTutorial}
-        aria-label="Restart tutorial"
-      >
-        Tour
-      </Button>
       <Button variant="outline" size="sm" onClick={() => void handleLogout()}>
         Log out
       </Button>

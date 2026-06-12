@@ -33,6 +33,8 @@ type TutorialContextValue = {
 };
 
 const TutorialContext = createContext<TutorialContextValue | null>(null);
+const tutorialEnabled = false;
+
 
 function readStoredStep() {
   if (typeof window === "undefined") return 0;
@@ -51,6 +53,14 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
+    if (!tutorialEnabled) {
+      window.localStorage.setItem(tutorialCompletedKey, "true");
+      window.localStorage.removeItem(tutorialStepKey);
+      setActive(false);
+      setMounted(true);
+      return;
+    }
+
     const completed = window.localStorage.getItem(tutorialCompletedKey) === "true";
     setStepIndex(readStoredStep());
     setActive(!completed);
@@ -77,12 +87,16 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startTutorial = useCallback(() => {
+    if (!tutorialEnabled) return;
+
     window.localStorage.removeItem(tutorialCompletedKey);
     setStepIndex(readStoredStep());
     setActive(true);
   }, []);
 
   const restartTutorial = useCallback(() => {
+    if (!tutorialEnabled) return;
+
     window.localStorage.removeItem(tutorialCompletedKey);
     window.localStorage.setItem(tutorialStepKey, "0");
     setStepIndex(0);
@@ -134,7 +148,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   return (
     <TutorialContext.Provider value={value}>
       {children}
-      {mounted ? <TutorialOverlay /> : null}
+      {mounted && tutorialEnabled ? <TutorialOverlay /> : null}
     </TutorialContext.Provider>
   );
 }
