@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,11 +16,7 @@ type TargetBox = {
 const bubbleWidth = 320;
 const viewportPadding = 16;
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function bubblePosition(target: TargetBox | null, placement: string | undefined) {
+function bubblePosition(target: TargetBox | null, placement: string | undefined): CSSProperties {
   if (typeof window === "undefined" || !target) {
     return {
       left: "50%",
@@ -30,30 +26,39 @@ function bubblePosition(target: TargetBox | null, placement: string | undefined)
   }
 
   const maxLeft = Math.max(viewportPadding, window.innerWidth - bubbleWidth - viewportPadding);
-  const preferredLeft = target.left + target.width / 2 - bubbleWidth / 2;
-  const left = clamp(preferredLeft, viewportPadding, maxLeft);
+  const centeredLeft = target.left + target.width / 2 - bubbleWidth / 2;
+  const left = Math.min(maxLeft, Math.max(viewportPadding, centeredLeft));
+  const maxTop = Math.max(viewportPadding, window.innerHeight - 220);
+  const top = Math.min(maxTop, Math.max(viewportPadding, target.top));
   const gap = 12;
-  const side = placement ?? "bottom";
 
-  if (side === "top") {
+  if (placement === "top") {
+    const bottom = Math.max(viewportPadding, window.innerHeight - target.top + gap);
+    return { left, bottom };
+  }
+
+  if (placement === "left") {
+    return {
+      left: Math.min(maxLeft, Math.max(viewportPadding, target.left - bubbleWidth - gap)),
+      top,
+    };
+  }
+
+  if (placement === "right") {
+    return {
+      left: Math.min(maxLeft, Math.max(viewportPadding, target.left + target.width + gap)),
+      top,
+    };
+  }
+
+  const belowTop = target.top + target.height + gap;
+  if (belowTop > window.innerHeight - 220 && target.top > 240) {
     return { left, bottom: Math.max(viewportPadding, window.innerHeight - target.top + gap) };
-  }
-  if (side === "left") {
-    return {
-      left: clamp(target.left - bubbleWidth - gap, viewportPadding, maxLeft),
-      top: clamp(target.top, viewportPadding, window.innerHeight - viewportPadding),
-    };
-  }
-  if (side === "right") {
-    return {
-      left: clamp(target.left + target.width + gap, viewportPadding, maxLeft),
-      top: clamp(target.top, viewportPadding, window.innerHeight - viewportPadding),
-    };
   }
 
   return {
     left,
-    top: clamp(target.top + target.height + gap, viewportPadding, window.innerHeight - viewportPadding),
+    top: Math.min(maxTop, Math.max(viewportPadding, belowTop)),
   };
 }
 
@@ -62,6 +67,7 @@ export function TutorialOverlay() {
     active,
     nextStep,
     previousStep,
+    routePending,
     skipTutorial,
     step,
     stepCount,
@@ -69,9 +75,23 @@ export function TutorialOverlay() {
   } = useTutorial();
   const [targetBox, setTargetBox] = useState<TargetBox | null>(null);
   const [targetMissing, setTargetMissing] = useState(false);
+  const frameRef = useRef<number | null>(null);
+  const settleTimerRef = useRef<number | null>(null);
 
-  const updateTarget = useCallback(() => {
-    if (!active || !step) return;
+  const clearScheduledWork = useCallback(() => {
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+  }, []);
+
+  const measureTarget = useCallback(() => {
+    if (!active || !step || routePending) return;
+
     const element = document.querySelector<HTMLElement>(`[data-tutorial="${step.target}"]`);
     if (!element) {
       setTargetBox(null);
@@ -79,39 +99,69 @@ export function TutorialOverlay() {
       return;
     }
 
-    element.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
-    window.setTimeout(() => {
-      const rect = element.getBoundingClientRect();
-      setTargetBox({
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-      });
-      setTargetMissing(false);
-    }, 180);
-  }, [active, step]);
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      setTargetBox(null);
+      setTargetMissing(true);
+      return;
+    }
+
+    setTargetBox({
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+    setTargetMissing(false);
+  }, [active, routePending, step]);
+
+  const scheduleMeasure = useCallback(() => {
+    if (frameRef.current !== null) return;
+
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      measureTarget();
+    });
+  }, [measureTarget]);
 
   useEffect(() => {
-    updateTarget();
-  }, [updateTarget]);
+    clearScheduledWork();
+    setTargetBox(null);
+    setTargetMissing(false);
+
+    if (!active || !step || routePending) return;
+
+    const element = document.querySelector<HTMLElement>(`[data-tutorial="${step.target}"]`);
+    if (!element) {
+      setTargetMissing(true);
+      return;
+    }
+
+    element.scrollIntoView({ block: "center", inline: "center", behavior: "auto" });
+    settleTimerRef.current = window.setTimeout(measureTarget, 80);
+
+    return clearScheduledWork;
+  }, [active, clearScheduledWork, measureTarget, routePending, step]);
 
   useEffect(() => {
-    if (!active) return;
-    window.addEventListener("resize", updateTarget);
-    window.addEventListener("orientationchange", updateTarget);
-    window.addEventListener("scroll", updateTarget, true);
+    if (!active || routePending) return;
+
+    window.addEventListener("resize", scheduleMeasure);
+    window.addEventListener("orientationchange", scheduleMeasure);
+    window.addEventListener("scroll", scheduleMeasure, true);
+
     return () => {
-      window.removeEventListener("resize", updateTarget);
-      window.removeEventListener("orientationchange", updateTarget);
-      window.removeEventListener("scroll", updateTarget, true);
+      window.removeEventListener("resize", scheduleMeasure);
+      window.removeEventListener("orientationchange", scheduleMeasure);
+      window.removeEventListener("scroll", scheduleMeasure, true);
+      clearScheduledWork();
     };
-  }, [active, updateTarget]);
+  }, [active, clearScheduledWork, routePending, scheduleMeasure]);
 
   if (!active || !step) return null;
 
-  const style = bubblePosition(targetMissing ? null : targetBox, step.placement);
-  const highlightStyle = targetBox
+  const style = bubblePosition(targetMissing || routePending ? null : targetBox, step.placement);
+  const highlightStyle = targetBox && !targetMissing && !routePending
     ? {
         left: targetBox.left - 6,
         top: targetBox.top - 6,
@@ -120,22 +170,27 @@ export function TutorialOverlay() {
       }
     : undefined;
   const isLast = stepIndex === stepCount - 1;
+  const statusBody = routePending
+    ? "Opening the right page for this step."
+    : targetMissing
+      ? step.missingBody ?? "This step is not visible right now. You can continue or come back after the related content is available."
+      : step.body;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-background/45 backdrop-blur-[1px]" />
+      <div className="absolute inset-0 bg-background/35" />
       {highlightStyle ? (
         <div
           aria-hidden="true"
-          className="absolute rounded-xl border-2 border-blue-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] transition-all"
+          className="absolute rounded-xl border-2 border-blue-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.32)] transition-[left,top,width,height] duration-150"
           style={highlightStyle}
         />
       ) : null}
       <section
         aria-live="polite"
         className={cn(
-          "pointer-events-auto fixed grid w-[calc(100vw-2rem)] max-w-[320px] gap-3 rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl",
-          targetMissing && "text-center",
+          "pointer-events-auto fixed grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[320px] gap-3 overflow-y-auto rounded-xl border bg-popover p-4 text-popover-foreground shadow-xl",
+          (targetMissing || routePending) && "text-center",
         )}
         style={style}
       >
@@ -144,10 +199,7 @@ export function TutorialOverlay() {
             Step {stepIndex + 1} of {stepCount}
           </p>
           <h2 className="text-base font-semibold leading-tight">{step.title}</h2>
-          <p className="text-sm leading-5 text-muted-foreground">
-            {targetMissing ? "This step is not visible on the current screen. Use Next or navigate with the sidebar to continue. " : ""}
-            {step.body}
-          </p>
+          <p className="text-sm leading-5 text-muted-foreground">{statusBody}</p>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button size="sm" variant="ghost" onClick={skipTutorial}>
@@ -157,7 +209,7 @@ export function TutorialOverlay() {
             <Button size="sm" variant="outline" disabled={stepIndex === 0} onClick={previousStep}>
               Back
             </Button>
-            <Button size="sm" onClick={nextStep}>
+            <Button size="sm" disabled={routePending} onClick={nextStep}>
               {isLast ? "Done" : "Next"}
             </Button>
           </div>
