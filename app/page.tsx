@@ -1681,7 +1681,6 @@ export default function CustomerOpsPage() {
                 "h-8 min-w-8 gap-1.5 border-blue-400/35 bg-blue-500/10 px-2.5 text-xs text-blue-700 hover:bg-blue-500/15 sm:px-3 dark:text-blue-200",
                 gmailSyncLoading && "bg-blue-500/15",
               )}
-              data-tutorial="inbox-sync"
               disabled={gmailSyncLoading || persistedLoading}
               size="sm"
               variant="outline"
@@ -2038,7 +2037,7 @@ function InboxDetailPanel({
                   onValueChange={(value) => setActiveTab(value as DetailTab)}
                   className="min-h-0 flex-1 gap-0 overflow-hidden"
                 >
-                  <div className="shrink-0 overflow-x-auto px-4 py-3" data-tutorial="inbox-detail-tabs">
+                  <div className="shrink-0 overflow-x-auto px-4 py-3">
                     <TabsList className="min-w-max">
                       <TabsTrigger value="thread">Thread</TabsTrigger>
                       <TabsTrigger value="invoice">Invoice</TabsTrigger>
@@ -2052,7 +2051,6 @@ function InboxDetailPanel({
                     <div
                       ref={threadScrollRef}
                       className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
-                      data-tutorial="inbox-thread-list"
                       onScroll={handleThreadScroll}
                       onWheel={handleThreadWheel}
                       onTouchStart={handleThreadTouchStart}
@@ -2093,7 +2091,6 @@ function InboxDetailPanel({
                   <TabsContent value="invoice" className="m-0 min-h-0 flex-1 overflow-hidden">
                     <div
                       className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
-                      data-tutorial="inbox-invoice"
                       onFocus={collapseThreadHeader}
                       onPointerDown={collapseThreadHeader}
                       onScroll={handleThreadScroll}
@@ -2234,7 +2231,6 @@ function DetailActionButtons({
             <Button
               aria-label="Thread actions"
               className="min-h-9 min-w-9 xl:hidden"
-              data-tutorial="inbox-actions"
               disabled={analysisActionLoading}
               size="icon"
               title="Thread actions"
@@ -2327,7 +2323,6 @@ function DetailActionButtons({
           <Button
             aria-label="Thread actions"
             className="min-h-9 min-w-9 2xl:hidden"
-            data-tutorial="inbox-actions"
             size="icon"
             title="Thread actions"
             variant="outline"
@@ -3136,7 +3131,6 @@ function PendingDraftMessage({
   return (
     <article
       className="relative sticky bottom-0 z-10 flex w-full shrink-0 justify-end overflow-y-auto overflow-x-hidden border-t bg-card/95 p-1.5 backdrop-blur sm:p-2"
-      data-tutorial="inbox-draft-actions"
       style={expandedPanelStyle}
     >
       {!isMobile ? (

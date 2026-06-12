@@ -53,7 +53,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarMenu className="px-2" data-tutorial="app-sidebar-nav">
+        <SidebarMenu className="px-2">
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton

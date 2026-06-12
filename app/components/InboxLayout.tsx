@@ -74,7 +74,6 @@ function QueueButtonRow<TValue extends string>({
     <nav
       aria-label="Inbox queues"
       className="flex shrink-0 gap-1.5 overflow-x-auto pb-1.5 scrollbar-none sm:grid sm:grid-cols-5 sm:gap-2 sm:pb-0"
-      data-tutorial="inbox-queues"
     >
       {queueItems.map((item) => {
         const active = activeQueue === item.value;

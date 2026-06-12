@@ -130,7 +130,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </CardContent>
       </Card>
 
-      <Card className="border-accent/30 bg-card/45 shadow-sm" data-tutorial="settings-gmail">
+      <Card className="border-accent/30 bg-card/45 shadow-sm">
         <CardHeader className="flex flex-row items-center gap-3 border-b border-accent/25 pb-4">
           <div className="rounded-md bg-blue-500/10 p-2.5 text-blue-500">
             <Mail className="size-4" />
@@ -263,7 +263,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </Card>
 
         <div>
-          <Card className="border-accent/30 bg-card/45 shadow-sm" data-tutorial="settings-zoho">
+          <Card className="border-accent/30 bg-card/45 shadow-sm">
             <CardHeader className="flex flex-row items-center gap-3 border-b border-accent/25 pb-4">
               <div className="rounded-md bg-indigo-500/10 p-2.5 text-indigo-500">
                 <Cable className="size-4" />

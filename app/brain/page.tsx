@@ -1074,7 +1074,7 @@ export default function BrainPage() {
               <p className="text-xs text-muted-foreground">{records.length} records · {evidenceCount} links · {openQuestions.length} gaps</p>
             )}
           </div>
-          <div className="relative w-full sm:w-72" data-tutorial="brain-search">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
             <Input aria-label="Search Company Brain" value={query} onChange={(event) => { if (allowChange()) setQuery(event.target.value); }} placeholder="Search knowledge..." className="pl-9 bg-background/50 focus-visible:ring-1" />
           </div>
@@ -1160,7 +1160,7 @@ export default function BrainPage() {
             </ScrollArea>
           </aside>
 
-          <section className="hidden md:flex relative min-h-[62vh] overflow-hidden border-b bg-background xl:min-h-0 xl:border-b-0 xl:border-r flex-col" data-tutorial="brain-graph">
+          <section className="hidden md:flex relative min-h-[62vh] overflow-hidden border-b bg-background xl:min-h-0 xl:border-b-0 xl:border-r flex-col">
             {loading ? (
               <div className="flex h-full min-h-[480px] items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Mapping company knowledge...</div>
             ) : records.length === 0 ? (
@@ -1186,7 +1186,7 @@ export default function BrainPage() {
             )}
           </section>
 
-          <aside className={`${mobileView === "details" ? "flex" : "hidden"} md:flex min-h-0 bg-background flex-col`} data-tutorial="brain-details">
+          <aside className={`${mobileView === "details" ? "flex" : "hidden"} md:flex min-h-0 bg-background flex-col`}>
             <ScrollArea className="h-full max-h-[70vh] xl:max-h-none">
               {source ? (
                 <div className="p-4">
