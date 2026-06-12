@@ -50,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { InboxLayout } from "./components/InboxLayout";
+import { useInboxEvents } from "@/hooks/use-inbox-events";
 import { useInboxSelection } from "@/hooks/use-inbox-selection";
 import { SafetyStatus } from "./components/SafetyStatus";
 import {
@@ -1117,10 +1118,6 @@ function isImportedReviewEvent(event: DisplayCateringEvent) {
 
 export default function CustomerOpsPage() {
   const [mounted, setMounted] = useState(false);
-  const [events, setEvents] = useState<CateringEvent[]>([]);
-  const [archive, setArchive] = useState<CateringEvent[]>([]);
-  const [persistedEvents, setPersistedEvents] = useState<PersistedInboxEvent[]>([]);
-  const [persistedLoading, setPersistedLoading] = useState(true);
   const [gmailSyncLoading, setGmailSyncLoading] = useState(false);
   const [gmailSyncMessage, setGmailSyncMessage] = useState("");
   const [inboxSidebarCollapsed, setInboxSidebarCollapsed] = useState(
@@ -1139,7 +1136,6 @@ export default function CustomerOpsPage() {
 
   useEffect(() => {
     setMounted(true);
-    void loadPersistedInboxEvents();
   }, []);
 
 
@@ -1150,43 +1146,6 @@ export default function CustomerOpsPage() {
     );
   }, [inboxSidebarCollapsed]);
 
-  async function loadPersistedInboxEvents() {
-    setPersistedLoading(true);
-    try {
-      const response = await fetch("/api/inbox/events?summary=1", { cache: "no-store" });
-      const body = (await response.json()) as {
-        events?: PersistedInboxEvent[];
-        error?: string;
-      };
-      if (!response.ok) throw new Error(body.error ?? "Could not load inbox events.");
-      setPersistedEvents(body.events ?? []);
-    } catch {
-      setPersistedEvents([]);
-    } finally {
-      setPersistedLoading(false);
-    }
-  }
-
-
-  async function loadPersistedInboxEventDetail(eventId: string) {
-    try {
-      const response = await fetch(`/api/inbox/events?eventId=${encodeURIComponent(eventId)}`, {
-        cache: "no-store",
-      });
-      const body = (await response.json()) as {
-        events?: PersistedInboxEvent[];
-        error?: string;
-      };
-      if (!response.ok) throw new Error(body.error ?? "Could not load inbox event detail.");
-      const detail = body.events?.[0];
-      if (!detail) return;
-      setPersistedEvents((current) =>
-        current.map((event) => (event.id === detail.id ? detail : event)),
-      );
-    } catch {
-      // Keep the summary row visible if detail fetch fails.
-    }
-  }
   async function loadZohoStatus() {
     try {
       const response = await fetch("/api/integrations/zoho/status", { cache: "no-store" });
@@ -1209,6 +1168,29 @@ export default function CustomerOpsPage() {
       setZohoInvoiceTemplate(null);
     }
   }
+
+  const mapPersistedInboxEventForDisplay = useCallback(
+    (event: PersistedInboxEvent) =>
+      mapPersistedInboxEvent(event, { reviewImport: shouldReviewImportedEvent(event) }),
+    [],
+  );
+
+  const {
+    activeEvents,
+    archivedInboxEvents,
+    loadPersistedInboxEventDetail,
+    loadPersistedInboxEvents,
+    persistedEvents,
+    persistedImportedReviewEvents,
+    persistedLoading,
+    setArchive,
+    setEvents,
+  } = useInboxEvents<PersistedInboxEvent, DisplayCateringEvent>({
+    archivedEvents: [],
+    events: [],
+    isImportedReviewEvent,
+    mapPersistedEvent: mapPersistedInboxEventForDisplay,
+  });
 
   async function syncGmailInbox() {
     setGmailSyncLoading(true);
@@ -1260,41 +1242,6 @@ export default function CustomerOpsPage() {
     return latest ?? { active: true, lastError: null, latestRun: null };
   }
 
-  const mappedPersistedEvents = useMemo(
-    () =>
-      persistedEvents.map((event) => {
-        const reviewImport = shouldReviewImportedEvent(event);
-        return mapPersistedInboxEvent(event, { reviewImport });
-      }),
-    [persistedEvents],
-  );
-  const persistedImportedReviewEvents = useMemo(
-    () =>
-      mappedPersistedEvents.filter(
-        (event) => event.status !== "closed" && isImportedReviewEvent(event),
-      ),
-    [mappedPersistedEvents],
-  );
-  const persistedActiveEvents = useMemo(
-    () =>
-      mappedPersistedEvents.filter(
-        (event) => event.status !== "closed" && !isImportedReviewEvent(event),
-      ),
-    [mappedPersistedEvents],
-  );
-  const persistedArchivedEvents = useMemo(
-    () => mappedPersistedEvents.filter((event) => event.status === "closed"),
-    [mappedPersistedEvents],
-  );
-  const hasPersistedEvents = mappedPersistedEvents.length > 0;
-  const activeEvents = useMemo<DisplayCateringEvent[]>(
-    () => (hasPersistedEvents ? persistedActiveEvents : events),
-    [events, hasPersistedEvents, persistedActiveEvents],
-  );
-  const archivedInboxEvents = useMemo<DisplayCateringEvent[]>(
-    () => (hasPersistedEvents ? persistedArchivedEvents : archive),
-    [archive, hasPersistedEvents, persistedArchivedEvents],
-  );
   const {
     activeTab,
     filter,
@@ -1346,6 +1293,21 @@ export default function CustomerOpsPage() {
     searchQuery,
   ]);
 
+  const queueCounts = useMemo(
+    () => ({
+      open: activeEvents.filter(
+        (event) => event.status === "needs_approval" || event.status === "needs_correction",
+      ).length,
+      waiting: activeEvents.filter((event) => event.status === "waiting_on_customer").length,
+      invoice: activeEvents.filter((event) => event.status === "invoice_ready" || event.status === "invoiced").length,
+      follow_up: activeEvents.filter((event) => event.status === "follow_up").length,
+      imported: persistedImportedReviewEvents.length,
+      archive: archivedInboxEvents.length,
+    }),
+    [activeEvents, archivedInboxEvents.length, persistedImportedReviewEvents.length],
+  );
+
+
   const selectedEvent =
     visibleEvents.find((event) => event.id === selectedId) ??
     visibleEvents[0];
@@ -1358,7 +1320,7 @@ export default function CustomerOpsPage() {
       persistedEvent.thread.messages.length >= persistedEvent.thread.messageCount &&
       persistedEvent.thread.messages.every((message) => message.bodyPlain !== null || message.bodyHtml !== null);
     if (!hasFullThread) void loadPersistedInboxEventDetail(persistedEvent.id);
-  }, [persistedEvents, selectedEvent]);
+  }, [loadPersistedInboxEventDetail, persistedEvents, selectedEvent]);
 
   useEffect(() => {
     if (activeTab !== "invoice" && selectedEvent?.status !== "invoice_ready") return;
@@ -1376,16 +1338,6 @@ export default function CustomerOpsPage() {
     if (!selectedId) setSelectedId(selectedEvent.id);
   }, [selectedEvent, selectedId, setSelectedId]);
 
-  const queueCounts = {
-    open: activeEvents.filter(
-      (event) => event.status === "needs_approval" || event.status === "needs_correction",
-    ).length,
-    waiting: activeEvents.filter((event) => event.status === "waiting_on_customer").length,
-    invoice: activeEvents.filter((event) => event.status === "invoice_ready" || event.status === "invoiced").length,
-    follow_up: activeEvents.filter((event) => event.status === "follow_up").length,
-    imported: persistedImportedReviewEvents.length,
-    archive: archivedInboxEvents.length,
-  };
 
 
   async function runPersistedAgentAnalysis() {
