@@ -75,7 +75,7 @@ export function SafetyStatus({ variant = "block" }: SafetyStatusProps) {
         <TooltipTrigger asChild>
           <button
             type="button"
-            className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+            className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-3 ${
               active
                 ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20"
                 : "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20 animate-pulse"
@@ -84,11 +84,11 @@ export function SafetyStatus({ variant = "block" }: SafetyStatusProps) {
             title={statusDescription}
           >
             {active ? (
-              <ShieldCheck className="size-3.5" />
+              <ShieldCheck className="size-3.5 shrink-0" />
             ) : (
-              <ShieldAlert className="size-3.5" />
+              <ShieldAlert className="size-3.5 shrink-0" />
             )}
-            <span>{active ? "Safety Mode" : "Safety: OFF"}</span>
+            <span className="whitespace-nowrap">{active ? "Safety ON" : "Safety OFF"}</span>
           </button>
         </TooltipTrigger>
         <TooltipContent
@@ -118,7 +118,7 @@ export function SafetyStatus({ variant = "block" }: SafetyStatusProps) {
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground leading-normal">
-                {statusDescription}
+                {statusDescription} Tap the status pill, then use this control to change mode.
               </p>
             </div>
             <dl className="grid gap-2 border-t pt-2 text-[10px] text-muted-foreground uppercase font-medium">

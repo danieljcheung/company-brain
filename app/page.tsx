@@ -56,6 +56,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { SafetyStatus } from "./components/SafetyStatus";
 import {
   extractEventDetails,
@@ -1693,15 +1694,15 @@ export default function CustomerOpsPage() {
   }
 
   return (
-      <main className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-1 flex-col gap-2 sm:gap-3 overflow-hidden p-2 sm:p-4">
-        <div className="flex shrink-0 items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
-            <Badge variant="secondary" className="h-5 px-1.5 text-xs font-semibold select-none">
+      <main className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-4">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">Inbox</h1>
+            <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-xs font-semibold select-none">
               {visibleEvents.length} Active
             </Badge>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
             {gmailSyncMessage && (
               <span className="hidden md:inline text-xs text-muted-foreground animate-pulse max-w-xs truncate">
                 {gmailSyncMessage}
@@ -1709,9 +1710,10 @@ export default function CustomerOpsPage() {
             )}
             <Button
               className={cn(
-                "gap-1.5 h-8 px-2.5 sm:px-3 text-xs border-blue-400/35 bg-blue-500/10 text-blue-700 hover:bg-blue-500/15 dark:text-blue-200",
+                "h-8 min-w-8 gap-1.5 border-blue-400/35 bg-blue-500/10 px-2.5 text-xs text-blue-700 hover:bg-blue-500/15 sm:px-3 dark:text-blue-200",
                 gmailSyncLoading && "bg-blue-500/15",
               )}
+              data-tutorial="inbox-sync"
               disabled={gmailSyncLoading || persistedLoading}
               size="sm"
               variant="outline"
@@ -1719,7 +1721,7 @@ export default function CustomerOpsPage() {
               onClick={syncGmailInbox}
             >
               <RefreshCw className={cn("size-3.5", gmailSyncLoading && "animate-spin")} />
-              <span className="hidden sm:inline">{gmailSyncLoading ? "Syncing..." : "Sync Gmail"}</span>
+              <span className="sr-only sm:not-sr-only">{gmailSyncLoading ? "Syncing..." : "Sync Gmail"}</span>
             </Button>
             <SafetyStatus variant="pill" />
           </div>
@@ -2342,7 +2344,7 @@ function InboxDetailPanel({
                   onValueChange={(value) => setActiveTab(value as DetailTab)}
                   className="min-h-0 flex-1 gap-0 overflow-hidden"
                 >
-                  <div className="shrink-0 overflow-x-auto px-4 py-3">
+                  <div className="shrink-0 overflow-x-auto px-4 py-3" data-tutorial="inbox-detail-tabs">
                     <TabsList className="min-w-max">
                       <TabsTrigger value="thread">Thread</TabsTrigger>
                       <TabsTrigger value="invoice">Invoice</TabsTrigger>
@@ -2355,7 +2357,8 @@ function InboxDetailPanel({
                     <div className="flex h-full min-h-0 flex-col">
                     <div
                       ref={threadScrollRef}
-                      className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+                      className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+                      data-tutorial="inbox-thread-list"
                       onScroll={handleThreadScroll}
                       onWheel={handleThreadWheel}
                       onTouchStart={handleThreadTouchStart}
@@ -2364,7 +2367,7 @@ function InboxDetailPanel({
                       onPointerDown={collapseThreadHeader}
                       tabIndex={0}
                     >
-                      <div className="space-y-4 p-4 pb-5">
+                      <div className="min-w-0 space-y-4 p-3 pb-5 sm:p-4">
                         {selectedEvent.thread.map((message) => (
                           <ThreadMessageBubble
                             attachmentActionId={attachmentActionId}
@@ -2395,7 +2398,8 @@ function InboxDetailPanel({
                   </TabsContent>
                   <TabsContent value="invoice" className="m-0 min-h-0 flex-1 overflow-hidden">
                     <div
-                      className="h-full min-h-0 overflow-y-auto overscroll-contain"
+                      className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
+                      data-tutorial="inbox-invoice"
                       onFocus={collapseThreadHeader}
                       onPointerDown={collapseThreadHeader}
                       onScroll={handleThreadScroll}
@@ -2404,7 +2408,7 @@ function InboxDetailPanel({
                       onWheel={handleThreadWheel}
                       tabIndex={0}
                     >
-                      <div className="grid gap-3 p-4 pb-5">
+                      <div className="grid min-w-0 gap-3 p-3 pb-5 sm:p-4">
                         {selectedEvent.invoicePreview ? (
                           <EditableInvoicePreview
                             key={selectedEvent.id}
@@ -2535,7 +2539,8 @@ function DetailActionButtons({
           <DropdownMenuTrigger asChild>
             <Button
               aria-label="Thread actions"
-              className="xl:hidden"
+              className="min-h-9 min-w-9 xl:hidden"
+              data-tutorial="inbox-actions"
               disabled={analysisActionLoading}
               size="icon"
               title="Thread actions"
@@ -2627,7 +2632,8 @@ function DetailActionButtons({
         <DropdownMenuTrigger asChild>
           <Button
             aria-label="Thread actions"
-            className="2xl:hidden"
+            className="min-h-9 min-w-9 2xl:hidden"
+            data-tutorial="inbox-actions"
             size="icon"
             title="Thread actions"
             variant="outline"
@@ -2700,7 +2706,7 @@ function ThreadMessageBubble({
     >
       <div
         className={cn(
-          "max-w-[82%] rounded-2xl border px-4 py-3 text-sm shadow-sm",
+          "min-w-0 max-w-full rounded-2xl border px-3 py-3 text-sm shadow-sm sm:max-w-[82%] sm:px-4",
           isCustomer
             ? "rounded-tl-md border-border bg-muted/60 text-foreground"
             : "rounded-tr-md border-blue-400/25 bg-blue-500/15 text-foreground",
@@ -2712,11 +2718,11 @@ function ThreadMessageBubble({
             "text-muted-foreground",
           )}
         >
-          <span className="font-medium text-foreground">{message.author}</span>
-          <span>{senderLabel}</span>
-          <span className="ml-auto">{message.at}</span>
+          <span className="min-w-0 max-w-full break-all font-medium text-foreground">{message.author}</span>
+          <span className="shrink-0">{senderLabel}</span>
+          <span className="w-full break-words sm:ml-auto sm:w-auto">{message.at}</span>
         </div>
-        <p className="whitespace-pre-wrap break-words leading-6">{visibleText}</p>
+        <p className="whitespace-pre-wrap break-words leading-6 [overflow-wrap:anywhere]">{visibleText}</p>
         {isLongMessage ? (
           <Button
             className="mt-2 px-2 text-xs"
@@ -2728,16 +2734,16 @@ function ThreadMessageBubble({
           </Button>
         ) : null}
         {attachments.length ? (
-          <details className="mt-3 rounded-md border bg-background/70">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground">
-              <Paperclip className="size-3.5" />
-              <span>
+          <details className="mt-3 min-w-0 rounded-md border bg-background/70">
+            <summary className="flex min-w-0 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground">
+              <Paperclip className="size-3.5 shrink-0" />
+              <span className="min-w-0 break-words">
                 {attachments.length} attachment{attachments.length === 1 ? "" : "s"}
               </span>
             </summary>
-            <div className="grid gap-1 border-t px-3 py-2 text-xs text-muted-foreground">
+            <div className="grid min-w-0 gap-1 border-t px-2 py-2 text-xs text-muted-foreground sm:px-3">
               {attachments.map((attachment) => (
-                <div className="grid gap-1 rounded-md border bg-background/70 p-2" key={attachment.id}>
+                <div className="grid min-w-0 gap-1 rounded-md border bg-background/70 p-2" key={attachment.id}>
                   {canPreviewImageAttachment(attachment) ? (
                     <a
                       className="group block overflow-hidden rounded-md border bg-muted/40"
@@ -2756,10 +2762,10 @@ function ThreadMessageBubble({
                     </a>
                   ) : null}
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <p className="min-w-0 flex-1 break-words font-medium text-foreground">
+                    <p className="min-w-0 flex-1 break-all font-medium text-foreground">
                       {attachment.filename}
                     </p>
-                    <Badge variant="outline">
+                    <Badge className="shrink-0" variant="outline">
                       {formatAttachmentLifecycle(attachment.lifecycleStatus)}
                     </Badge>
                   </div>
@@ -2836,12 +2842,12 @@ function EventDetailsPanel({ event }: { event: DisplayCateringEvent }) {
 
   if (!event.eventDetails) {
     return (
-      <div className="grid gap-3 p-4 md:grid-cols-2">
+      <div className="grid min-w-0 gap-3 p-3 sm:p-4 md:grid-cols-2">
         {event.facts.map((fact) => (
-          <article className="rounded-lg border p-3" key={fact.label}>
-            <p className="text-xs text-muted-foreground">{fact.label}</p>
-            <strong className="mt-1 block">{fact.value}</strong>
-            <p className="mt-2 text-xs text-muted-foreground">
+          <article className="min-w-0 rounded-lg border p-3" key={fact.label}>
+            <p className="break-words text-xs text-muted-foreground">{fact.label}</p>
+            <strong className="mt-1 block break-words [overflow-wrap:anywhere]">{fact.value}</strong>
+            <p className="mt-2 break-all text-xs text-muted-foreground">
               {Math.round(fact.confidence * 100)}% / {fact.sourceMessageId}
             </p>
           </article>
@@ -2851,20 +2857,20 @@ function EventDetailsPanel({ event }: { event: DisplayCateringEvent }) {
   }
 
   return (
-    <div className="grid gap-4 p-4">
-      <div className="grid gap-3 lg:grid-cols-[1fr_0.8fr]">
-        <section className={cn("rounded-lg border p-4", tone.soft)}>
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-            <Info className={cn("size-4", tone.icon)} />
+    <div className="grid min-w-0 gap-4 p-3 sm:p-4">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+        <section className={cn("min-w-0 rounded-lg border p-3 sm:p-4", tone.soft)}>
+          <div className="mb-3 flex min-w-0 items-center gap-2 text-sm font-medium">
+            <Info className={cn("size-4 shrink-0", tone.icon)} />
             Event details
           </div>
           {event.eventDetails.fields.length ? (
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid min-w-0 gap-2 md:grid-cols-2">
               {event.eventDetails.fields.map((field) => (
-                <article className="rounded-md border bg-background/75 p-3" key={field.key}>
-                  <p className="text-xs text-muted-foreground">{field.label}</p>
-                  <strong className="mt-1 block break-words text-sm">{field.value}</strong>
-                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                <article className="min-w-0 rounded-md border bg-background/75 p-3" key={field.key}>
+                  <p className="break-words text-xs text-muted-foreground">{field.label}</p>
+                  <strong className="mt-1 block break-words text-sm [overflow-wrap:anywhere]">{field.value}</strong>
+                  <p className="mt-2 break-words text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                     {field.source === "persisted" ? "Saved extraction" : field.sourceMessageId}
                     {field.sourceSnippet ? ` / ${field.sourceSnippet}` : ""}
                   </p>
@@ -2877,14 +2883,14 @@ function EventDetailsPanel({ event }: { event: DisplayCateringEvent }) {
             </p>
           )}
         </section>
-        <section className="grid gap-3">
-          <div className={cn("rounded-lg border p-4", missingTone.soft)}>
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <AlertCircle className={cn("size-4", missingTone.icon)} />
+        <section className="grid min-w-0 gap-3">
+          <div className={cn("min-w-0 rounded-lg border p-3 sm:p-4", missingTone.soft)}>
+            <div className="mb-3 flex min-w-0 items-center gap-2 text-sm font-medium">
+              <AlertCircle className={cn("size-4 shrink-0", missingTone.icon)} />
               Missing info
             </div>
             {event.missingInfo.length ? (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex min-w-0 flex-wrap gap-1.5">
                 {event.missingInfo.map((item) => (
                   <Badge className={missingTone.chip} key={item} variant="outline">
                     {item}
@@ -2895,17 +2901,17 @@ function EventDetailsPanel({ event }: { event: DisplayCateringEvent }) {
               <p className="text-sm text-muted-foreground">No quote blockers captured.</p>
             )}
           </div>
-          <div className={cn("rounded-lg border p-4", invoiceTone.soft)}>
-            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-              <DollarSign className={cn("size-4", invoiceTone.icon)} />
+          <div className={cn("min-w-0 rounded-lg border p-3 sm:p-4", invoiceTone.soft)}>
+            <div className="mb-3 flex min-w-0 items-center gap-2 text-sm font-medium">
+              <DollarSign className={cn("size-4 shrink-0", invoiceTone.icon)} />
               Invoice readiness
             </div>
-            <Badge className={invoiceTone.chip} variant="outline">
+            <Badge className={cn("max-w-full break-words", invoiceTone.chip)} variant="outline">
               {event.eventDetails.invoiceReadiness.ready ? "Invoice accepted" : "Not ready"}
             </Badge>
-            <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
+            <div className="mt-3 grid min-w-0 gap-2 text-sm text-muted-foreground">
               {event.eventDetails.invoiceReadiness.hints.map((hint) => (
-                <p key={hint}>{hint}</p>
+                <p className="break-words [overflow-wrap:anywhere]" key={hint}>{hint}</p>
               ))}
             </div>
           </div>
@@ -3074,16 +3080,16 @@ function EditableInvoicePreview({
   }
 
   return (
-    <section className="rounded-lg border bg-background">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4">
-        <div>
+    <section className="min-w-0 rounded-lg border bg-background">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b p-3 sm:p-4">
+        <div className="min-w-0">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Invoice preview</p>
-          <h3 className="mt-1 text-lg font-semibold">Popup Pearl</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h3 className="mt-1 break-words text-lg font-semibold">Popup Pearl</h3>
+          <p className="mt-1 break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
             Bill to {event.customer}{customerEmail ? ` / ${customerEmail}` : ""}
           </p>
         </div>
-        <div className="text-left text-sm sm:text-right">
+        <div className="min-w-0 text-left text-sm sm:text-right">
           <div className="flex flex-wrap gap-1 sm:justify-end">
             <Badge variant="outline">{formatStatus(preview.status)}</Badge>
             {template?.templateName ? (
@@ -3096,22 +3102,22 @@ function EditableInvoicePreview({
           </p>
         </div>
       </div>
-      <div className="grid gap-3 border-b p-4 text-sm md:grid-cols-4">
-        <div>
+      <div className="grid min-w-0 gap-3 border-b p-3 text-sm sm:p-4 md:grid-cols-4">
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Event date</p>
-          <strong>{eventDate}</strong>
+          <strong className="break-words">{eventDate}</strong>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Service window</p>
-          <strong>{serviceWindow || "Review required"}</strong>
+          <strong className="break-words">{serviceWindow || "Review required"}</strong>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Location</p>
-          <strong>{location || "Review required"}</strong>
+          <strong className="break-words [overflow-wrap:anywhere]">{location || "Review required"}</strong>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Payment terms</p>
-          <strong>{template?.paymentTermsLabel || "Review required"}</strong>
+          <strong className="break-words">{template?.paymentTermsLabel || "Review required"}</strong>
         </div>
       </div>
       {templateStatus?.synced ? (
@@ -3124,10 +3130,10 @@ function EditableInvoicePreview({
           No Zoho invoice template context imported yet. Import recent invoice templates from Settings to mirror Zoho more closely.
         </div>
       )}
-      <div className="grid gap-3 p-4">
+      <div className="grid min-w-0 gap-3 p-3 sm:p-4">
         {lineItems.map((line, index) => (
           <div
-            className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-[1fr_96px_128px_128px]"
+            className="grid min-w-0 gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_96px_128px_128px]"
             key={`${preview.id}-${index}`}
           >
             <label className="grid gap-1 text-xs text-muted-foreground">
@@ -3194,8 +3200,9 @@ function EditableInvoicePreview({
             ) : null}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-3">
+        <div className="flex min-w-0 flex-col gap-2 rounded-md border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Button
+            className="w-full sm:w-auto"
             disabled={!zohoStatus?.canCreateInvoice || !event.persistedEventId || zohoCreateLoading}
             onClick={() => createInvoice()}
             size="sm"
@@ -3204,6 +3211,7 @@ function EditableInvoicePreview({
             {zohoCreateLoading ? "Creating..." : "Create Zoho invoice"}
           </Button>
           <Button
+            className="w-full sm:w-auto"
             disabled={
               !zohoStatus?.canCreateInvoice ||
               !event.persistedEventId ||
@@ -3218,7 +3226,7 @@ function EditableInvoicePreview({
           >
             {zohoSendLoading ? "Sending..." : "Send invoice via Zoho"}
           </Button>
-          <span className="text-xs text-muted-foreground">
+          <span className="min-w-0 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
             Create first, review in Zoho, then send the final invoice email to the customer through Zoho.
             {linkedZohoInvoice?.emailSent ? " Sent from Company Brain." : ""}
             {!zohoStatus?.canCreateInvoice
@@ -3381,10 +3389,10 @@ function PendingDraftMessage({
   onSaveEdits: () => void;
   onSend: () => void;
 }) {
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(() => event.status === "invoice_ready");
   const autoCollapsedEventIdRef = useRef<string | null>(null);
   const [panelHeight, setPanelHeight] = useState(initialDraftPanelHeight);
-
   useEffect(() => {
     if (event.status !== "invoice_ready") {
       autoCollapsedEventIdRef.current = null;
@@ -3425,18 +3433,27 @@ function PendingDraftMessage({
     window.addEventListener("pointerup", onPointerUp, { once: true });
   }
 
+  const expandedPanelStyle = collapsed
+    ? undefined
+    : isMobile
+      ? { maxHeight: "55dvh" }
+      : { height: panelHeight, maxHeight: "72dvh" };
+
   return (
     <article
-      className="relative sticky bottom-0 z-10 flex w-full shrink-0 justify-end overflow-y-auto border-t bg-card/95 p-1.5 backdrop-blur sm:p-2"
-      style={collapsed ? undefined : { height: panelHeight, maxHeight: "72dvh" }}
+      className="relative sticky bottom-0 z-10 flex w-full shrink-0 justify-end overflow-y-auto overflow-x-hidden border-t bg-card/95 p-1.5 backdrop-blur sm:p-2"
+      data-tutorial="inbox-draft-actions"
+      style={expandedPanelStyle}
     >
-      <button
-        aria-label="Resize draft panel"
-        className="absolute left-0 right-0 top-0 h-2 cursor-ns-resize touch-none border-t border-blue-400/20 bg-transparent hover:bg-blue-400/10"
-        onPointerDown={startPanelResize}
-        type="button"
-      />
-      <div className="flex h-full w-full flex-col rounded-md border border-blue-400/30 bg-blue-500/10 px-2.5 py-2 text-sm shadow-sm sm:px-3">
+      {!isMobile ? (
+        <button
+          aria-label="Resize draft panel"
+          className="absolute left-0 right-0 top-0 h-2 cursor-ns-resize touch-none border-t border-blue-400/20 bg-transparent hover:bg-blue-400/10"
+          onPointerDown={startPanelResize}
+          type="button"
+        />
+      ) : null}
+      <div className="flex min-h-0 w-full flex-col rounded-md border border-blue-400/30 bg-blue-500/10 px-2.5 py-2 text-sm shadow-sm sm:h-full sm:px-3">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Local draft</span>
           <span className="min-w-0 flex-1 truncate text-[11px]">{subject}</span>
@@ -3461,21 +3478,21 @@ function PendingDraftMessage({
         {collapsed ? null : (
           <>
             <Textarea
-              className="min-h-0 flex-1 resize-none border-blue-400/20 bg-background/80 text-sm leading-6"
+              className="min-h-36 flex-1 resize-none border-blue-400/20 bg-background/80 text-sm leading-6 max-md:max-h-[28dvh] md:min-h-0"
               value={body}
               placeholder="No active draft. Generate a local draft to preview/edit it here."
               onChange={(event) => onBodyChange(event.target.value)}
             />
-            <div className="mt-2 flex shrink-0 flex-wrap items-center justify-between gap-2">
-              <p className="max-w-md text-xs text-muted-foreground">
+            <div className="mt-2 grid shrink-0 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+              <p className="min-w-0 break-words text-xs text-muted-foreground sm:max-w-md">
                 {actionMessage || helperText}
               </p>
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-end">
                 {isPersisted ? (
                   <>
                     <Button
+                      className="w-full sm:w-auto"
                       disabled={actionLoading}
-                      size="sm"
                       variant="secondary"
                       onClick={() =>
                         onDraftAction(hasPersistedDraft ? "regenerate" : "generate")
@@ -3484,6 +3501,7 @@ function PendingDraftMessage({
                       {hasPersistedDraft ? "Regenerate" : "Generate draft"}
                     </Button>
                     <Button
+                      className="w-full sm:w-auto"
                       disabled={actionLoading || !hasPersistedDraft}
                       size="sm"
                       onClick={onSend}
@@ -3492,6 +3510,7 @@ function PendingDraftMessage({
                       Approve and Send
                     </Button>
                     <Button
+                      className="w-full sm:w-auto"
                       disabled={actionLoading || !hasPersistedDraft}
                       size="sm"
                       variant="ghost"
@@ -3503,11 +3522,12 @@ function PendingDraftMessage({
                 ) : null}
                 {!isPersisted ? (
                   <>
-                    <Button size="sm" onClick={onSend}>
+                    <Button className="w-full sm:w-auto" size="sm" onClick={onSend}>
                       <Send className="size-4" />
                       {reviewLabel}
                     </Button>
                     <Button
+                      className="w-full sm:w-auto"
                       size="sm"
                       variant="secondary"
                       onClick={onSaveEdits}
@@ -3515,6 +3535,7 @@ function PendingDraftMessage({
                       Save edits
                     </Button>
                     <Button
+                      className="w-full sm:w-auto"
                       size="sm"
                       variant="ghost"
                       onClick={onNeedsCorrection}
@@ -3638,7 +3659,8 @@ function QueueButtonRow({
   return (
     <nav
       aria-label="Inbox queues"
-      className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none shrink-0 sm:grid sm:grid-cols-5 sm:gap-2 sm:pb-0"
+      className="flex shrink-0 gap-1.5 overflow-x-auto pb-1.5 scrollbar-none sm:grid sm:grid-cols-5 sm:gap-2 sm:pb-0"
+      data-tutorial="inbox-queues"
     >
       {queueFilters.map((item) => {
         const tone = toneByQueue(item.value);

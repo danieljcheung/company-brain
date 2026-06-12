@@ -269,7 +269,7 @@ export default function IngestionPage() {
       </div>
 
       <div className="grid items-start gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="min-w-0 border-accent/30 bg-card/45 shadow-sm transition-all hover:shadow-md">
+        <Card className="min-w-0 border-accent/30 bg-card/45 shadow-sm transition-all hover:shadow-md" data-tutorial="ingestion-upload">
           <CardHeader className="flex flex-row items-center gap-3 border-b border-accent/25 pb-4">
             <div className="rounded-md bg-blue-500/10 p-2.5 text-blue-500">
               <FolderOpen className="size-4" />
@@ -295,7 +295,7 @@ export default function IngestionPage() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 border-accent/30 bg-card/45 shadow-sm transition-all hover:shadow-md">
+        <Card className="min-w-0 border-accent/30 bg-card/45 shadow-sm transition-all hover:shadow-md" data-tutorial="ingestion-source-upload">
           <CardHeader className="flex flex-row items-center gap-3 border-b border-accent/25 pb-4">
             <div className="rounded-md bg-indigo-500/10 p-2.5 text-indigo-500">
               <Clipboard className="size-4" />
@@ -331,7 +331,7 @@ export default function IngestionPage() {
               <CardDescription className="text-xs">{pendingCandidates.length} pending brain entries.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="grid max-h-[65vh] gap-4 overflow-y-auto overscroll-contain pr-1 pt-4 md:max-h-[72vh] md:pr-2">
+          <CardContent className="grid max-h-[65vh] gap-4 overflow-y-auto overscroll-contain pr-1 pt-4 md:max-h-[72vh] md:pr-2" data-tutorial="ingestion-candidates">
             {pendingCandidates.map((candidate) => {
               const draft = drafts[candidate.id] ?? {
                 title: candidate.title,

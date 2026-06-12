@@ -50,13 +50,20 @@ Company Brain is a Next.js operations app for Popup Pearl catering work. It comb
 
 ## Gmail sync behavior
 
-The app exposes sync endpoints; scheduling is external.
+The app exposes sync endpoints and the Talos deployment schedules the background endpoint with a Kubernetes CronJob every five minutes.
 
-- `POST /api/inbox/sync/gmail`
-- `POST /api/inbox/sync/gmail/background`
-- `GET /api/inbox/sync/gmail/background`
+- `POST /api/inbox/sync/gmail` — synchronous/manual sync.
+- `POST /api/inbox/sync/gmail/background` — starts an async sync run.
+- `GET /api/inbox/sync/gmail/background` — reports the latest background run.
 
-Background sync uses a Postgres advisory lock so overlapping runs do not process the same company at the same time. Unchanged threads are skipped when no new Gmail message IDs are found.
+Background sync uses a Postgres advisory lock so overlapping timed/manual runs do not process the same company at the same time. Unchanged threads are skipped when no new Gmail message IDs are found.
+
+Production scheduling options considered:
+
+- **Current:** Kubernetes CronJob in `talos-kubernetes-homelab/manifests/company-brain-app/gmail-sync-cronjob.yaml`, calling the in-cluster service with `Authorization: Bearer $COMPANY_BRAIN_API_TOKEN`.
+- **In-app timer loop:** lower manifest overhead, but fragile across restarts and replicas.
+- **External cron services:** GitHub Actions, Cloudflare Worker Cron, QStash, or Inngest work later, but require a public secure trigger surface or another service account.
+- **Gmail Pub/Sub push:** best long-term latency, but needs Google Cloud Pub/Sub and a routed webhook.
 
 ## Local development
 
