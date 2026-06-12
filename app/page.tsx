@@ -27,11 +27,8 @@ import {
   Maximize2,
   Minimize2,
   MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
   Paperclip,
   RefreshCw,
-  Search,
   Send,
   ChevronLeft,
   History,
@@ -46,17 +43,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { InboxLayout } from "./components/InboxLayout";
+import { useInboxSelection } from "@/hooks/use-inbox-selection";
 import { SafetyStatus } from "./components/SafetyStatus";
 import {
   extractEventDetails,
@@ -79,7 +73,6 @@ import {
 type QueueFilter = "open" | "waiting" | "invoice" | "imported" | "follow_up" | "archive";
 const triageSummaryMarker = "Needs triage before Needs Reply.";
 type DetailTab = "thread" | "invoice" | "facts" | "history";
-type MobilePane = "list" | "detail";
 type DisplayAttachment = {
   id: string;
   filename: string;
@@ -951,14 +944,6 @@ function toneByStatus(status: CateringEventStatus) {
   return toneByKey("active");
 }
 
-function toneByQueue(value: QueueFilter) {
-  if (value === "invoice") return toneByKey("ready");
-  if (value === "waiting") return toneByKey("waiting");
-  if (value === "imported") return toneByKey("review");
-  if (value === "follow_up") return toneByKey("waiting");
-  if (value === "archive") return toneByKey("archived");
-  return toneByKey("active");
-}
 
 function toneByKey(key: "active" | "missing" | "ready" | "review" | "waiting" | "archived") {
   const tones = {
@@ -1128,6 +1113,8 @@ function isImportedReviewEvent(event: DisplayCateringEvent) {
   return isPersistedDisplayEvent(event) && event.summary.includes(triageSummaryMarker);
 }
 
+
+
 export default function CustomerOpsPage() {
   const [mounted, setMounted] = useState(false);
   const [events, setEvents] = useState<CateringEvent[]>([]);
@@ -1136,13 +1123,9 @@ export default function CustomerOpsPage() {
   const [persistedLoading, setPersistedLoading] = useState(true);
   const [gmailSyncLoading, setGmailSyncLoading] = useState(false);
   const [gmailSyncMessage, setGmailSyncMessage] = useState("");
-  const [filter, setFilter] = useState<QueueFilter>("open");
   const [inboxSidebarCollapsed, setInboxSidebarCollapsed] = useState(
     getStoredInboxSidebarCollapsed,
   );
-  const [activeTab, setActiveTab] = useState<DetailTab>("thread");
-  const [mobilePane, setMobilePane] = useState<MobilePane>("list");
-  const [selectedId, setSelectedId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [draftBody, setDraftBody] = useState("");
   const [draftActionMessage, setDraftActionMessage] = useState("");
@@ -1312,6 +1295,33 @@ export default function CustomerOpsPage() {
     () => (hasPersistedEvents ? persistedArchivedEvents : archive),
     [archive, hasPersistedEvents, persistedArchivedEvents],
   );
+  const {
+    activeTab,
+    filter,
+    mobilePane,
+    selectedId,
+    selectEvent,
+    selectFilter,
+    setActiveTab,
+    setFilter,
+    setMobilePane,
+    setSelectedId,
+  } = useInboxSelection<DisplayCateringEvent, QueueFilter, DetailTab>({
+    activeEvents,
+    archivedEvents: archivedInboxEvents,
+    archiveFilter: "archive",
+    archiveTab: "history",
+    defaultFilter: "open",
+    defaultTab: "thread",
+    importedEvents: persistedImportedReviewEvents,
+    listEvents: filterEvents,
+    onActionMessagesClear: () => {
+      setDraftActionMessage("");
+      setAnalysisActionMessage("");
+    },
+    onDraftBodyChange: setDraftBody,
+  });
+
   const visibleEvents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const filtered = filterEvents(
@@ -1364,7 +1374,7 @@ export default function CustomerOpsPage() {
 
     setDraftBody(selectedEvent.draftReply.body);
     if (!selectedId) setSelectedId(selectedEvent.id);
-  }, [selectedEvent, selectedId]);
+  }, [selectedEvent, selectedId, setSelectedId]);
 
   const queueCounts = {
     open: activeEvents.filter(
@@ -1377,33 +1387,6 @@ export default function CustomerOpsPage() {
     archive: archivedInboxEvents.length,
   };
 
-  function selectFilter(nextFilter: QueueFilter) {
-    const nextEvents = filterEvents(
-      activeEvents,
-      archivedInboxEvents,
-      persistedImportedReviewEvents,
-      nextFilter,
-    );
-    setFilter(nextFilter);
-    setActiveTab(nextFilter === "archive" ? "history" : "thread");
-    setMobilePane("list");
-    if (nextEvents[0]) {
-      setSelectedId(nextEvents[0].id);
-      setDraftBody(nextEvents[0].draftReply.body);
-    } else {
-      setSelectedId("");
-      setDraftBody("");
-    }
-  }
-
-  function selectEvent(event: DisplayCateringEvent) {
-    setSelectedId(event.id);
-    setDraftBody(event.draftReply.body);
-    setDraftActionMessage("");
-    setAnalysisActionMessage("");
-    setActiveTab(filter === "archive" ? "history" : "thread");
-    setMobilePane("detail");
-  }
 
   async function runPersistedAgentAnalysis() {
     if (!selectedEvent?.persistedEventId) return;
@@ -1693,6 +1676,39 @@ export default function CustomerOpsPage() {
     );
   }
 
+  const inboxList = (
+    <EventList
+      events={visibleEvents}
+      selectedId={selectedEvent?.id}
+      onSelect={selectEvent}
+    />
+  );
+  const inboxDetail = (
+    <InboxDetailPanel
+      activeTab={activeTab}
+      closeSelected={closeSelected}
+      analysisActionLoading={analysisActionLoading}
+      analysisActionMessage={analysisActionMessage}
+      draftActionLoading={draftActionLoading}
+      draftActionMessage={draftActionMessage}
+      draftBody={draftBody}
+      attachmentActionId={attachmentActionId}
+      zohoStatus={zohoStatus}
+      zohoInvoiceTemplate={zohoInvoiceTemplate}
+      onBack={() => setMobilePane("list")}
+      onAttachmentAction={runAttachmentAction}
+      onRunAnalysis={runPersistedAgentAnalysis}
+      onDraftAction={runPersistedDraftAction}
+      onTriageStatus={updatePersistedStatus}
+      onSendEmail={sendPersistedDraft}
+      onTitleChange={updateSelectedTitle}
+      selectedEvent={selectedEvent}
+      setActiveTab={setActiveTab}
+      setDraftBody={setDraftBody}
+      updateSelected={updateSelected}
+    />
+  );
+
   return (
       <main className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 sm:gap-3 sm:p-4">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 sm:gap-4">
@@ -1727,295 +1743,21 @@ export default function CustomerOpsPage() {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border bg-card">
-          <div className="flex h-full min-h-0 flex-1 flex-col 2xl:hidden">
-            <div
-              className={cn(
-                "grid shrink-0 gap-2 border-b p-2 sm:p-3",
-                mobilePane === "detail" ? "hidden md:grid" : "grid",
-              )}
-            >
-              <QueueButtonRow
-                filter={filter}
-                queueCounts={queueCounts}
-                onSelectFilter={selectFilter}
-              />
-              <div className="flex min-w-0 gap-2">
-                <div className="relative min-w-0 flex-1">
-                  <Search className="absolute left-2.5 top-3 md:top-2.5 size-4 text-muted-foreground" />
-                  <Input
-                    className="h-10 md:h-8 pl-8 text-sm"
-                    placeholder="Search threads"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-1">
-              <section
-                className={cn(
-                  "min-h-0 flex-1 flex-col md:flex-none md:w-[24rem] md:shrink-0 md:border-r",
-                  mobilePane === "detail" ? "hidden md:flex" : "flex",
-                )}
-              >
-                <EventList
-                  events={visibleEvents}
-                  selectedId={selectedEvent?.id}
-                  onSelect={selectEvent}
-                />
-              </section>
-
-              <section
-                className={cn(
-                  "min-h-0 flex-1 flex-col",
-                  mobilePane === "list" ? "hidden md:flex" : "flex",
-                )}
-              >
-                <InboxDetailPanel
-                  activeTab={activeTab}
-                  closeSelected={closeSelected}
-                  analysisActionLoading={analysisActionLoading}
-                  analysisActionMessage={analysisActionMessage}
-                  draftActionLoading={draftActionLoading}
-                  draftActionMessage={draftActionMessage}
-                  draftBody={draftBody}
-	                  attachmentActionId={attachmentActionId}
-	                  zohoStatus={zohoStatus}
-                  onTitleChange={updateSelectedTitle}
-	                  zohoInvoiceTemplate={zohoInvoiceTemplate}
-	                  onBack={() => setMobilePane("list")}
-                  onAttachmentAction={runAttachmentAction}
-                  onRunAnalysis={runPersistedAgentAnalysis}
-                  onDraftAction={runPersistedDraftAction}
-                  onTriageStatus={updatePersistedStatus}
-                  onSendEmail={sendPersistedDraft}
-                  selectedEvent={selectedEvent}
-                  setActiveTab={setActiveTab}
-                  setDraftBody={setDraftBody}
-                  updateSelected={updateSelected}
-                />
-              </section>
-            </div>
-          </div>
-
-          <div className="hidden h-full min-h-0 flex-1 overflow-hidden 2xl:block">
-          {inboxSidebarCollapsed ? (
-            <div className="flex h-full min-w-0">
-              <aside
-                aria-label="Inbox controls"
-                className="flex h-full w-[4.5rem] shrink-0 flex-col items-center overflow-hidden border-r py-2"
-              >
-                <Button
-                  aria-label="Expand inbox sidebar"
-                  aria-pressed={inboxSidebarCollapsed}
-                  className="size-10 shrink-0"
-                  size="icon"
-                  title="Expand inbox sidebar"
-                  variant="ghost"
-                  onClick={() => setInboxSidebarCollapsed(false)}
-                >
-                  <PanelLeftOpen className="size-5" />
-                </Button>
-                <Separator className="my-2 w-full" />
-                <nav className="flex w-full flex-col items-center gap-1 px-2">
-                  {queueFilters.map((item) => (
-                    <Button
-                      aria-label={`${item.label}: ${queueCounts[item.value]}`}
-                      aria-current={filter === item.value ? "page" : undefined}
-                      aria-pressed={filter === item.value}
-                      className={cn(
-                        "size-10 shrink-0",
-                        filter === item.value && "bg-muted text-foreground",
-                      )}
-                      key={item.value}
-                      size="icon"
-                      title={`${item.label}: ${queueCounts[item.value]}`}
-                      variant="ghost"
-                      onClick={() => selectFilter(item.value)}
-                    >
-                      <item.icon className="size-5" />
-                    </Button>
-                  ))}
-                </nav>
-              </aside>
-
-              <ResizablePanelGroup
-                orientation="horizontal"
-                className="min-h-0 min-w-0 flex-1"
-              >
-                <ResizablePanel defaultSize="39%" minSize="16rem">
-                  <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                    <div className="shrink-0 px-4 py-3">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-                        <Input
-                          className="pl-8"
-                          placeholder="Search threads"
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <Separator />
-                    <EventList
-                      events={visibleEvents}
-                      selectedId={selectedEvent?.id}
-                      onSelect={selectEvent}
-                    />
-                  </div>
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-
-                <ResizablePanel
-                  className="min-h-0 overflow-hidden"
-                  defaultSize="61%"
-                  minSize="28rem"
-                >
-                  <InboxDetailPanel
-                    activeTab={activeTab}
-                    closeSelected={closeSelected}
-                    analysisActionLoading={analysisActionLoading}
-                    analysisActionMessage={analysisActionMessage}
-                    draftActionLoading={draftActionLoading}
-                    draftActionMessage={draftActionMessage}
-                    draftBody={draftBody}
-	                    attachmentActionId={attachmentActionId}
-                    onTitleChange={updateSelectedTitle}
-	                    zohoStatus={zohoStatus}
-	                    zohoInvoiceTemplate={zohoInvoiceTemplate}
-	                    onAttachmentAction={runAttachmentAction}
-                    onRunAnalysis={runPersistedAgentAnalysis}
-                    onDraftAction={runPersistedDraftAction}
-                    onTriageStatus={updatePersistedStatus}
-                    onSendEmail={sendPersistedDraft}
-                    selectedEvent={selectedEvent}
-                    setActiveTab={setActiveTab}
-                    setDraftBody={setDraftBody}
-                    updateSelected={updateSelected}
-                  />
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            </div>
-          ) : (
-            <ResizablePanelGroup
-              orientation="horizontal"
-              className="h-full min-h-0"
-            >
-              <ResizablePanel
-                className="overflow-hidden"
-                defaultSize="24%"
-                minSize="17rem"
-              >
-              <aside className="flex h-full min-w-0 flex-col overflow-hidden">
-                <div className="flex min-w-0 items-center gap-2 p-3">
-                  <div className="min-w-0 flex-1" />
-                  <Button
-                    aria-label="Collapse inbox sidebar"
-                    aria-pressed={inboxSidebarCollapsed}
-                    className="size-10 shrink-0"
-                    size="icon"
-                    title="Collapse inbox sidebar"
-                    variant="ghost"
-                    onClick={() => setInboxSidebarCollapsed(true)}
-                  >
-                    <PanelLeftClose className="size-5" />
-                  </Button>
-                </div>
-                <Separator />
-                <div className="px-3 py-3">
-                  <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium uppercase tracking-normal text-muted-foreground">
-                    <span className="truncate">Queues</span>
-                    <span className="shrink-0">{visibleEvents.length} shown</span>
-                  </div>
-                  <nav className="grid gap-1" aria-label="Inbox queues">
-                    {queueFilters.map((item) => (
-                      <button
-                        aria-label={`${item.label}: ${queueCounts[item.value]}`}
-                        aria-current={filter === item.value ? "page" : undefined}
-                        aria-pressed={filter === item.value}
-                        className={cn(
-                          "flex h-10 min-w-0 items-center gap-2 rounded-md px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                          filter === item.value && "bg-muted text-foreground ring-1 ring-accent/45",
-                        )}
-                        key={item.value}
-                        title={`${item.label}: ${queueCounts[item.value]}`}
-                        type="button"
-                        onClick={() => selectFilter(item.value)}
-                      >
-                        <item.icon className="size-4 shrink-0" />
-                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                        <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
-                          {queueCounts[item.value]}
-                        </span>
-                      </button>
-                    ))}
-                  </nav>
-                </div>
-              </aside>
-              </ResizablePanel>
-
-              <ResizableHandle withHandle />
-
-              <ResizablePanel defaultSize="30%" minSize="16rem">
-                <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                  <div className="shrink-0 px-4 py-3">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-                      <Input
-                        className="pl-8"
-                        placeholder="Search threads"
-                        value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <Separator />
-                  <EventList
-                    events={visibleEvents}
-                    selectedId={selectedEvent?.id}
-                    onSelect={selectEvent}
-                  />
-                </div>
-              </ResizablePanel>
-
-              <ResizableHandle withHandle />
-
-              <ResizablePanel
-                className="min-h-0 overflow-hidden"
-                defaultSize="46%"
-                minSize="28rem"
-              >
-                <InboxDetailPanel
-                  activeTab={activeTab}
-                  closeSelected={closeSelected}
-                  analysisActionLoading={analysisActionLoading}
-                  analysisActionMessage={analysisActionMessage}
-                  draftActionLoading={draftActionLoading}
-                  draftActionMessage={draftActionMessage}
-                  draftBody={draftBody}
-	                  attachmentActionId={attachmentActionId}
-	                  zohoStatus={zohoStatus}
-	                  zohoInvoiceTemplate={zohoInvoiceTemplate}
-	                  onAttachmentAction={runAttachmentAction}
-                  onRunAnalysis={runPersistedAgentAnalysis}
-
-                  onDraftAction={runPersistedDraftAction}
-                  onTriageStatus={updatePersistedStatus}
-                  onSendEmail={sendPersistedDraft}
-                  onTitleChange={updateSelectedTitle}
-                  selectedEvent={selectedEvent}
-                  setActiveTab={setActiveTab}
-                  setDraftBody={setDraftBody}
-                  updateSelected={updateSelected}
-                />
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          )}
-          </div>
-        </div>
+        <InboxLayout
+          activeQueue={filter}
+          detail={inboxDetail}
+          list={inboxList}
+          mobilePane={mobilePane}
+          queueCounts={queueCounts}
+          queueItems={queueFilters}
+          searchQuery={searchQuery}
+          shownCount={visibleEvents.length}
+          sidebarCollapsed={inboxSidebarCollapsed}
+          onCollapseSidebar={() => setInboxSidebarCollapsed(true)}
+          onExpandSidebar={() => setInboxSidebarCollapsed(false)}
+          onSearchChange={(event) => setSearchQuery(event.target.value)}
+          onSelectQueue={selectFilter}
+        />
       </main>
   );
 }
@@ -3647,46 +3389,3 @@ function EventList({
   );
 }
 
-function QueueButtonRow({
-  filter,
-  queueCounts,
-  onSelectFilter,
-}: {
-  filter: QueueFilter;
-  queueCounts: Record<QueueFilter, number>;
-  onSelectFilter: (value: QueueFilter) => void;
-}) {
-  return (
-    <nav
-      aria-label="Inbox queues"
-      className="flex shrink-0 gap-1.5 overflow-x-auto pb-1.5 scrollbar-none sm:grid sm:grid-cols-5 sm:gap-2 sm:pb-0"
-      data-tutorial="inbox-queues"
-    >
-      {queueFilters.map((item) => {
-        const tone = toneByQueue(item.value);
-
-        return (
-          <button
-            aria-label={`${item.label}: ${queueCounts[item.value]}`}
-            aria-current={filter === item.value ? "page" : undefined}
-            aria-pressed={filter === item.value}
-            className={cn(
-              "flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border px-2.5 py-1 text-center text-xs text-muted-foreground transition-colors sm:h-11 sm:w-auto sm:justify-start sm:text-left",
-              filter === item.value ? `${tone.soft} text-foreground font-semibold` : `${tone.hover} hover:text-foreground`,
-            )}
-            key={item.value}
-            title={`${item.label}: ${queueCounts[item.value]}`}
-            type="button"
-            onClick={() => onSelectFilter(item.value)}
-          >
-            <item.icon className={cn("size-3.5 shrink-0 sm:size-4", filter === item.value && tone.icon)} />
-            <span className="min-w-0 truncate text-[11px] sm:text-xs">{item.label}</span>
-            <span className="shrink-0 text-[10px] sm:text-[11px] font-medium opacity-80">
-              {queueCounts[item.value]}
-            </span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
